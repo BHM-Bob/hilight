@@ -121,6 +121,89 @@
       background-color: #b71c1c;
     }
     
+    .data-management-section {
+      margin-bottom: 20px;
+      padding: 12px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .section-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #333;
+      margin: 0 0 10px 0;
+      text-align: center;
+    }
+    
+    .data-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+    
+    .data-button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: center;
+    }
+    
+    .save-button {
+      background-color: #4CAF50;
+      color: white;
+    }
+    
+    .save-button:hover {
+      background-color: #45a049;
+    }
+    
+    .load-button {
+      background-color: #2196F3;
+      color: white;
+    }
+    
+    .load-button:hover {
+      background-color: #0b7dda;
+    }
+    
+    .delete-button {
+      background-color: #FF9800;
+      color: white;
+    }
+    
+    .delete-button:hover {
+      background-color: #e68900;
+    }
+    
+    .export-button {
+      background-color: #9C27B0;
+      color: white;
+    }
+    
+    .export-button:hover {
+      background-color: #7B1FA2;
+    }
+    
+    .import-button {
+      background-color: #607D8B;
+      color: white;
+    }
+    
+    .import-button:hover {
+      background-color: #546E7A;
+    }
+    
+    .import-file-input {
+      display: none;
+    }
+    
     .instructions {
       font-size: 12px;
       color: #666;
@@ -164,6 +247,20 @@
   
   <div class="clear-all-section">
     <button id="clear-all-button" class="clear-all-button">清除所有高亮</button>
+  </div>
+  
+  <div class="data-management-section">
+    <h3 class="section-title">数据管理</h3>
+    <div class="data-buttons">
+      <button id="save-button" class="data-button save-button">保存页面</button>
+      <button id="load-button" class="data-button load-button">加载页面</button>
+      <button id="delete-button" class="data-button delete-button">删除页面</button>
+      <button id="export-button" class="data-button export-button">导出数据</button>
+    </div>
+    <div style="text-align: center;">
+      <button id="import-button" class="data-button import-button" style="width: 100%;">导入数据</button>
+      <input type="file" id="import-file-input" class="import-file-input" accept=".json">
+    </div>
   </div>
   
   <div class="instructions">

@@ -589,6 +589,21 @@ chrome.runtime.onMessage.addListener((message) => {
   } else if (message.action === 'clearAllHighlights') {
     // 清除所有高亮
     clearHighlights();
+  } else if (message.action === 'savePageHighlights') {
+    // 保存当前页面的高亮数据
+    savePageHighlights();
+  } else if (message.action === 'loadPageHighlights') {
+    // 加载当前页面的高亮数据
+    loadPageHighlights();
+  } else if (message.action === 'deletePageHighlights') {
+    // 删除当前页面的高亮数据
+    deletePageHighlights();
+  } else if (message.action === 'exportHighlights') {
+    // 导出高亮数据
+    exportHighlights();
+  } else if (message.action === 'importHighlights') {
+    // 导入高亮数据
+    importHighlights(message.data);
   }
 });
 
@@ -597,4 +612,404 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', init);
 } else {
   init();
+}
+
+// 获取当前页面的规范化URL哈希
+function getPageHash() {
+  // 创建一个规范化的URL，移除查询参数和片段标识符
+  const url = new URL(window.location.href);
+  const normalizedUrl = url.origin + url.pathname;
+  
+  // 简单哈希函数
+  let hash = 0;
+  for (let i = 0; i < normalizedUrl.length; i++) {
+    const char = normalizedUrl.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // 转换为32位整数
+  }
+  
+  return hash.toString();
+}
+
+// 获取当前页面的所有高亮数据
+function getPageHighlights() {
+  const highlights = [];
+  const highlightedElements = document.querySelectorAll('span.highlight-text');
+  
+  highlightedElements.forEach(element => {
+    // 获取高亮元素的文本内容
+    const text = element.textContent;
+    
+    // 获取高亮颜色
+    const backgroundColor = element.style.backgroundColor;
+    
+    // 获取元素在页面中的位置信息
+    const rect = element.getBoundingClientRect();
+    const position = {
+      top: rect.top + window.scrollY,
+      left: rect.left + window.scrollX,
+      width: rect.width,
+      height: rect.height
+    };
+    
+    // 获取元素的XPath路径
+    const xpath = getXPathForElement(element);
+    
+    highlights.push({
+      text,
+      color: backgroundColor,
+      position,
+      xpath
+    });
+  });
+  
+  return highlights;
+}
+
+// 获取元素的XPath路径
+function getXPathForElement(element) {
+  if (element.id !== '') {
+    return `id("${element.id}")`;
+  }
+  
+  if (element === document.body) {
+    return element.tagName;
+  }
+  
+  let ix = 0;
+  const siblings = element.parentNode.childNodes;
+  
+  for (let i = 0; i < siblings.length; i++) {
+    const sibling = siblings[i];
+    if (sibling === element) {
+      return `${getXPathForElement(element.parentNode)}/${element.tagName}[${ix + 1}]`;
+    }
+    
+    if (sibling.nodeType === 1 && sibling.tagName === element.tagName) {
+      ix++;
+    }
+  }
+}
+
+// 保存当前页面的高亮数据
+function savePageHighlights() {
+  const pageHash = getPageHash();
+  const highlights = getPageHighlights();
+  
+  if (highlights.length === 0) {
+    chrome.runtime.sendMessage({ 
+      action: 'showStatus', 
+      message: '当前页面没有高亮数据可保存' 
+    });
+    return;
+  }
+  
+  // 获取现有数据
+  chrome.storage.local.get(['pageHighlights'], (result) => {
+    const pageHighlights = result.pageHighlights || {};
+    
+    // 更新当前页面的高亮数据
+    pageHighlights[pageHash] = {
+      url: window.location.href,
+      title: document.title,
+      highlights: highlights,
+      lastUpdated: new Date().toISOString()
+    };
+    
+    // 保存数据
+    chrome.storage.local.set({ pageHighlights }, () => {
+      const message = `已保存 ${highlights.length} 个高亮数据`;
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: message 
+      });
+      
+      // 同时显示桌面通知
+      if (chrome.notifications) {
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'images/icon48.svg',
+          title: '保存成功',
+          message: message,
+          priority: 0
+        });
+      }
+    });
+  });
+}
+
+// 加载当前页面的高亮数据
+function loadPageHighlights() {
+  const pageHash = getPageHash();
+  
+  // 获取保存的数据
+  chrome.storage.local.get(['pageHighlights'], (result) => {
+    const pageHighlights = result.pageHighlights || {};
+    const pageData = pageHighlights[pageHash];
+    
+    if (!pageData || !pageData.highlights || pageData.highlights.length === 0) {
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: '当前页面没有保存的高亮数据' 
+      });
+      return;
+    }
+    
+    // 清除当前页面的所有高亮
+    clearHighlights();
+    
+    // 恢复高亮
+    let restoredCount = 0;
+    pageData.highlights.forEach(highlightData => {
+      try {
+        // 尝试通过XPath找到元素
+        const element = getElementByXPath(highlightData.xpath);
+        
+        if (element) {
+          // 如果元素已存在，更新其样式
+          element.style.backgroundColor = highlightData.color;
+          element.classList.add('highlight-text');
+          element.style.padding = '1px 2px';
+          element.style.borderRadius = '2px';
+          element.style.cursor = 'pointer';
+          element.style.position = 'relative';
+          element.style.zIndex = '10';
+          
+          // 添加点击事件以取消高亮
+          element.addEventListener('click', function() {
+            this.outerHTML = this.innerHTML;
+          });
+          
+          restoredCount++;
+        } else {
+          // 如果找不到元素，尝试通过文本内容匹配
+          const textNodes = findTextNodes(document.body, highlightData.text);
+          
+          if (textNodes.length > 0) {
+            const textNode = textNodes[0];
+            const range = document.createRange();
+            range.selectNodeContents(textNode);
+            
+            // 创建高亮元素
+            const highlightElement = document.createElement('span');
+            highlightElement.classList.add('highlight-text');
+            highlightElement.style.backgroundColor = highlightData.color;
+            highlightElement.style.padding = '1px 2px';
+            highlightElement.style.borderRadius = '2px';
+            highlightElement.style.cursor = 'pointer';
+            highlightElement.style.position = 'relative';
+            highlightElement.style.zIndex = '10';
+            
+            // 添加点击事件以取消高亮
+            highlightElement.addEventListener('click', function() {
+              this.outerHTML = this.innerHTML;
+            });
+            
+            // 用高亮元素包裹选中的文本
+            range.surroundContents(highlightElement);
+            restoredCount++;
+          }
+        }
+      } catch (e) {
+        console.error('恢复高亮失败:', e);
+      }
+    });
+    
+    const message = `已恢复 ${restoredCount} 个高亮`;
+    chrome.runtime.sendMessage({ 
+      action: 'showStatus', 
+      message: message 
+    });
+    
+    // 同时显示桌面通知
+    if (chrome.notifications) {
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'images/icon48.svg',
+        title: '加载成功',
+        message: message,
+        priority: 0
+      });
+    }
+  });
+}
+
+// 通过XPath获取元素
+function getElementByXPath(xpath) {
+  return document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+}
+
+// 查找包含特定文本的文本节点
+function findTextNodes(root, searchText) {
+  const textNodes = [];
+  const treeWalker = document.createTreeWalker(
+    root,
+    NodeFilter.SHOW_TEXT,
+    null,
+    false
+  );
+  
+  let node;
+  while (node = treeWalker.nextNode()) {
+    if (node.nodeValue.includes(searchText)) {
+      textNodes.push(node);
+    }
+  }
+  
+  return textNodes;
+}
+
+// 删除当前页面的高亮数据
+function deletePageHighlights() {
+  const pageHash = getPageHash();
+  
+  // 获取保存的数据
+  chrome.storage.local.get(['pageHighlights'], (result) => {
+    const pageHighlights = result.pageHighlights || {};
+    
+    if (!pageHighlights[pageHash]) {
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: '当前页面没有保存的高亮数据' 
+      });
+      return;
+    }
+    
+    // 删除当前页面的高亮数据
+    delete pageHighlights[pageHash];
+    
+    // 保存更新后的数据
+    chrome.storage.local.set({ pageHighlights }, () => {
+      // 清除当前页面的所有高亮
+      clearHighlights();
+      
+      const message = '已删除当前页面的高亮数据';
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: message 
+      });
+      
+      // 同时显示桌面通知
+      if (chrome.notifications) {
+        chrome.notifications.create({
+          type: 'basic',
+          iconUrl: 'images/icon48.svg',
+          title: '删除成功',
+          message: message,
+          priority: 0
+        });
+      }
+    });
+  });
+}
+
+// 导出高亮数据
+function exportHighlights() {
+  // 获取所有保存的高亮数据
+  chrome.storage.local.get(['pageHighlights'], (result) => {
+    const pageHighlights = result.pageHighlights || {};
+    
+    if (Object.keys(pageHighlights).length === 0) {
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: '没有可导出的高亮数据' 
+      });
+      return;
+    }
+    
+    // 创建导出数据
+    const exportData = {
+      version: '1.0',
+      exportDate: new Date().toISOString(),
+      pageHighlights: pageHighlights
+    };
+    
+    // 转换为JSON字符串
+    const dataStr = JSON.stringify(exportData, null, 2);
+    
+    // 创建Blob对象
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    
+    // 创建下载链接
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `highlights_export_${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    const message = '高亮数据已导出';
+    chrome.runtime.sendMessage({ 
+      action: 'showStatus', 
+      message: message 
+    });
+    
+    // 同时显示桌面通知
+    if (chrome.notifications) {
+      chrome.notifications.create({
+        type: 'basic',
+        iconUrl: 'images/icon48.svg',
+        title: '导出成功',
+        message: message,
+        priority: 0
+      });
+    }
+  });
+}
+
+// 导入高亮数据
+function importHighlights(data) {
+  try {
+    // 解析导入的数据
+    const importData = JSON.parse(data);
+    
+    if (!importData.pageHighlights) {
+      chrome.runtime.sendMessage({ 
+        action: 'showStatus', 
+        message: '导入的数据格式不正确' 
+      });
+      return;
+    }
+    
+    // 获取现有数据
+    chrome.storage.local.get(['pageHighlights'], (result) => {
+      const pageHighlights = result.pageHighlights || {};
+      
+      // 合并数据
+      let importedCount = 0;
+      Object.keys(importData.pageHighlights).forEach(pageHash => {
+        if (!pageHighlights[pageHash]) {
+          pageHighlights[pageHash] = importData.pageHighlights[pageHash];
+          importedCount++;
+        }
+      });
+      
+      // 保存合并后的数据
+      chrome.storage.local.set({ pageHighlights }, () => {
+        const message = `成功导入 ${importedCount} 个页面的高亮数据`;
+        chrome.runtime.sendMessage({ 
+          action: 'showStatus', 
+          message: message 
+        });
+        
+        // 同时显示桌面通知
+        if (chrome.notifications) {
+          chrome.notifications.create({
+            type: 'basic',
+            iconUrl: 'images/icon48.svg',
+            title: '导入成功',
+            message: message,
+            priority: 0
+          });
+        }
+      });
+    });
+  } catch (e) {
+    chrome.runtime.sendMessage({ 
+      action: 'showStatus', 
+      message: '导入数据失败，请检查文件格式' 
+    });
+  }
 }

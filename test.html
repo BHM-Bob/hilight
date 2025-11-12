@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>高亮扩展测试页面</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            line-height: 1.6;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1, h2, h3 {
+            color: #333;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .instructions {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+    <h1>高亮扩展测试页面</h1>
+    
+    <div class="instructions">
+        <h2>测试说明</h2>
+        <p>1. 选择下面的文本，然后点击出现的高亮图标来创建高亮</p>
+        <p>2. 使用popup中的"保存"按钮来保存当前页面的高亮</p>
+        <p>3. 刷新页面后，使用"加载"按钮来恢复之前保存的高亮</p>
+        <p>4. 使用"导出"按钮来导出高亮数据</p>
+        <p>5. 使用"导入"按钮来导入之前导出的高亮数据</p>
+        <p>6. 使用"删除"按钮来删除当前页面的高亮数据</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>第一段测试文本</h2>
+        <p>这是一段用于测试高亮功能的文本。您可以选择这段文本中的任何部分，然后使用高亮工具来标记它们。这段文本包含了足够的内容，可以测试高亮工具的各种功能。</p>
+        <p>高亮工具可以帮助您在阅读网页时标记重要内容。通过选择文本并点击高亮图标，您可以轻松地为文本添加颜色标记。</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>第二段测试文本</h2>
+        <p>这是另一段测试文本。您可以尝试在这段文本中创建多个高亮，然后测试保存和加载功能。高亮工具会将您的高亮数据保存在本地存储中，即使刷新页面也能恢复。</p>
+        <p>您还可以尝试使用不同的颜色来高亮不同类型的文本。例如，您可以使用黄色高亮重要概念，使用绿色高亮示例，使用红色高亮警告信息。</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>第三段测试文本</h2>
+        <p>这是第三段测试文本。您可以尝试在这段文本中创建高亮，然后测试导出和导入功能。导出功能会将您的高亮数据保存为JSON文件，您可以将这个文件分享给其他人或在其他设备上使用。</p>
+        <p>导入功能允许您从之前导出的JSON文件中恢复高亮数据。这样，您就可以在不同的浏览器或设备之间同步您的高亮数据。</p>
+    </div>
+    
+    <div class="test-section">
+        <h2>测试通知功能</h2>
+        <p>当您执行保存、加载、删除、导出或导入操作时，扩展程序会显示系统通知来告知您操作结果。这些通知会出现在您的操作系统中，帮助您了解操作是否成功完成。</p>
+    </div>
+</body>
+</html>
