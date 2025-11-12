@@ -2,97 +2,139 @@
 /* 高亮图标样式 */
 .highlight-icon {
   position: fixed;
-  width: 30px;
-  height: 30px;
-  background-color: #4285f4;
-  color: white;
+  z-index: 9999;
+  cursor: pointer;
+  padding: 4px;
   border-radius: 50%;
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+  font-size: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  z-index: 10000;
-  font-size: 16px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
-  transition: transform 0.2s ease;
+  width: 40px;
+  height: 40px;
+  transition: all 0.2s ease;
+  animation: fadeIn 0.2s ease-in-out;
 }
 
 .highlight-icon:hover {
   transform: scale(1.1);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
 }
 
 .highlight-icon.docked {
-  width: 40px;
-  height: 40px;
-  background-color: #4285f4;
-  opacity: 0.7;
-}
-
-.highlight-icon.docked:hover {
-  opacity: 1;
-}
-
-/* 高亮弹出框样式 */
-.highlight-popup {
   position: fixed;
-  background-color: white;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  padding: 8px;
-  z-index: 10001;
   display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-width: 200px;
+  align-items: center;
+  justify-content: center;
 }
 
+/* 高亮颜色选择弹出框的样式 */
+.highlight-popup {
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 160px;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+/* 高亮颜色选项样式 */
 .highlight-color-option {
-  width: 30px;
-  height: 30px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
+  margin: 2px;
   cursor: pointer;
-  border: 2px solid transparent;
-  transition: transform 0.2s ease;
+  display: inline-block;
+  transition: all 0.2s ease;
 }
 
 .highlight-color-option:hover {
   transform: scale(1.1);
 }
 
+/* 清除高亮选项样式 */
 .highlight-clear-option {
-  padding: 8px 12px;
-  background-color: transparent;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-  cursor: pointer;
+  width: 100%;
+  margin-top: 8px;
+  padding: 4px 8px;
   text-align: center;
-  font-size: 14px;
-  color: #333;
+  color: #666;
+  cursor: pointer;
+  font-size: 12px;
+  border-radius: 2px;
   transition: background-color 0.2s ease;
 }
 
-/* 高亮文本样式 */
+.highlight-clear-option:hover {
+  background-color: #f0f0f0;
+}
+
+/* 高亮文本的样式 */
 span.highlight-text {
-  position: relative;
-  z-index: 1;
+  transition: all 0.2s ease;
+  /* 确保跨行高亮时行间距一致 */
+  line-height: inherit;
+  /* 防止跨行高亮时出现不必要的边距 */
+  margin: 0;
+  /* 确保文本换行时高亮效果连贯 */
+  display: inline;
+  /* 防止高亮元素影响文本布局 */
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+  /* 确保跨行高亮时背景连续 */
+  background-clip: padding-box;
+  -webkit-background-clip: padding-box;
 }
 
-/* 使用伪元素实现高亮效果 */
-span.highlight-text::before {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(255, 255, 0, 0.3);
-  z-index: -1;
-  border-radius: 2px;
-}
-
-/* 悬停效果 */
 span.highlight-text:hover {
-  outline: 2px solid #4285f4;
-  outline-offset: 1px;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.8);
+}
+
+/* 动画效果 */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* 防止文本选择被干扰 */
+.highlight-icon,
+.highlight-popup {
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .highlight-icon {
+    font-size: 14px !important;
+    padding: 3px !important;
+    width: 36px !important;
+    height: 36px !important;
+  }
+  
+  .highlight-popup {
+    padding: 6px !important;
+    gap: 3px !important;
+    min-width: 140px !important;
+  }
+  
+  .highlight-color-option {
+    width: 20px !important;
+    height: 20px !important;
+  }
 }

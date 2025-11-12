@@ -10,7 +10,6 @@ let customColors = [];
 let isDragging = false;
 let dragStartX = 0;
 let dragStartY = 0;
-let highlightIdCounter = 0; // 用于生成唯一ID
 
 // 高亮颜色选项
 const defaultHighlightColors = [
@@ -278,6 +277,14 @@ function showHighlightPopup(x, y) {
   }, 0);
 }
 
+// 隐藏高亮图标（仅在跟随鼠标模式下）
+function hideHighlightIcon() {
+  if (iconPositionMode !== 'follow' || !highlightIcon) return;
+  
+  document.body.removeChild(highlightIcon);
+  highlightIcon = null;
+}
+
 // 隐藏高亮弹出框
 function hideHighlightPopup() {
   if (highlightPopup) {
@@ -301,93 +308,186 @@ function hideHighlightPopupOnClickOutside(event) {
 function clearHighlights() {
   const highlightedElements = document.querySelectorAll('span.highlight-text');
   highlightedElements.forEach(element => {
-    // 获取元素的文本内容
-    const textContent = element.textContent;
-    
-    // 创建新的文本节点
-    const textNode = document.createTextNode(textContent);
-    
-    // 用文本节点替换高亮元素
-    element.parentNode.replaceChild(textNode, element);
+    element.outerHTML = element.innerHTML;
   });
   
   hideHighlightPopup();
 }
 
-// 清除所有高亮（从popup调用）
-function clearAllHighlights() {
-  const highlightedElements = document.querySelectorAll('span.highlight-text');
-  highlightedElements.forEach(element => {
-    // 获取元素的文本内容
-    const textContent = element.textContent;
-    
-    // 创建新的文本节点
-    const textNode = document.createTextNode(textContent);
-    
-    // 用文本节点替换高亮元素
-    element.parentNode.replaceChild(textNode, element);
+// 获取最高的z-index值
+function getMaxZIndex() {
+  let maxZIndex = 10; // 默认最低z-index
+  const elements = document.querySelectorAll('span.highlight-text');
+  
+  elements.forEach(element => {
+    const zIndex = parseInt(window.getComputedStyle(element).getPropertyValue('z-index'));
+    if (!isNaN(zIndex) && zIndex > maxZIndex) {
+      maxZIndex = zIndex;
+    }
   });
+  
+  return maxZIndex;
+}
+
+// 分解Range为多个文本段
+function decomposeRange(range) {
+  const segments = [];
+  
+  // 获取范围内的所有节点
+  const startNode = range.startContainer;
+  const endNode = range.endContainer;
+  const startOffset = range.startOffset;
+  const endOffset = range.endOffset;
+  
+  // 如果开始和结束是同一个文本节点
+  if (startNode === endNode && startNode.nodeType === Node.TEXT_NODE) {
+    segments.push({
+      node: startNode,
+      startOffset: startOffset,
+      endOffset: endOffset
+    });
+    return segments;
+  }
+  
+  // 处理开始节点
+  if (startNode.nodeType === Node.TEXT_NODE) {
+    segments.push({
+      node: startNode,
+      startOffset: startOffset,
+      endOffset: startNode.length
+    });
+  }
+  
+  // 使用TreeWalker遍历范围内的所有节点
+  const treeWalker = document.createTreeWalker(
+    range.commonAncestorContainer,
+    NodeFilter.SHOW_TEXT,
+    {
+      acceptNode: function(node) {
+        // 只接受在范围内的文本节点
+        if (range.intersectsNode(node)) {
+          return NodeFilter.FILTER_ACCEPT;
+        }
+        return NodeFilter.FILTER_REJECT;
+      }
+    }
+  );
+  
+  let currentNode = treeWalker.currentNode;
+  
+  // 跳过开始节点（已经处理）
+  if (currentNode === startNode) {
+    currentNode = treeWalker.nextNode();
+  }
+  
+  // 处理中间的所有文本节点
+  while (currentNode && currentNode !== endNode) {
+    segments.push({
+      node: currentNode,
+      startOffset: 0,
+      endOffset: currentNode.length
+    });
+    currentNode = treeWalker.nextNode();
+  }
+  
+  // 处理结束节点
+  if (endNode && endNode.nodeType === Node.TEXT_NODE && endNode !== startNode) {
+    segments.push({
+      node: endNode,
+      startOffset: 0,
+      endOffset: endOffset
+    });
+  }
+  
+  return segments;
+}
+
+// 高亮单个文本段
+function highlightTextSegment(segment, zIndex) {
+  const { node, startOffset, endOffset } = segment;
+  
+  // 如果文本段为空，则跳过
+  if (startOffset === endOffset) return null;
+  
+  // 创建高亮元素
+  const highlightElement = document.createElement('span');
+  highlightElement.classList.add('highlight-text');
+  highlightElement.style.backgroundColor = currentHighlightColor;
+  highlightElement.style.padding = '1px 2px';
+  highlightElement.style.borderRadius = '2px';
+  highlightElement.style.cursor = 'pointer';
+  highlightElement.style.position = 'relative'; // 确保z-index生效
+  highlightElement.style.zIndex = zIndex; // 设置更高的z-index
+  
+  // 添加点击事件以取消高亮
+  highlightElement.addEventListener('click', function() {
+    this.outerHTML = this.innerHTML;
+  });
+  
+  // 创建范围并高亮文本
+  const range = document.createRange();
+  range.setStart(node, startOffset);
+  range.setEnd(node, endOffset);
+  
+  try {
+    // 用高亮元素包裹选中的文本
+    range.surroundContents(highlightElement);
+    return highlightElement;
+  } catch (e) {
+    console.error('高亮文本段失败:', e);
+    return null;
+  }
 }
 
 // 高亮选中的文本
 function highlightSelectedText() {
   if (!selectedText || !selectedRange) return;
   
-  // 生成唯一ID
-  const uniqueId = `highlight-${highlightIdCounter++}`;
+  // 获取当前最大的z-index值，确保新的高亮元素显示在上层
+  const maxZIndex = getMaxZIndex() + 1;
   
-  // 创建一个新的span元素来包裹选中的文本
-  const highlightElement = document.createElement('span');
-  highlightElement.classList.add('highlight-text');
-  highlightElement.setAttribute('data-highlight-id', uniqueId);
-  highlightElement.setAttribute('data-highlight-color', currentHighlightColor);
-  highlightElement.style.cursor = 'pointer';
+  // 检查选中的文本范围内是否已经有高亮元素
+  const existingHighlights = getHighlightsInRange(selectedRange);
   
-  // 创建样式元素来设置伪元素的背景色
-  const styleId = `highlight-style-${uniqueId}`;
-  let styleElement = document.getElementById(styleId);
-  
-  if (!styleElement) {
-    styleElement = document.createElement('style');
-    styleElement.id = styleId;
-    styleElement.textContent = `
-      span[data-highlight-id="${uniqueId}"]::before {
-        background-color: ${currentHighlightColor} !important;
-      }
-    `;
-    document.head.appendChild(styleElement);
+  // 如果有重叠的高亮元素，先移除它们
+  if (existingHighlights.length > 0) {
+    removeHighlights(existingHighlights);
   }
   
-  // 添加点击事件以取消高亮
-  highlightElement.addEventListener('click', function() {
-    // 获取元素的文本内容
-    const textContent = this.textContent;
-    
-    // 创建新的文本节点
-    const textNode = document.createTextNode(textContent);
-    
-    // 用文本节点替换高亮元素
-    this.parentNode.replaceChild(textNode, this);
-    
-    // 移除对应的样式元素
-    const styleElement = document.getElementById(styleId);
-    if (styleElement) {
-      document.head.removeChild(styleElement);
-    }
-  });
-  
-  // 复制选中范围
-  const newRange = selectedRange.cloneRange();
-  
+  // 尝试使用原有的高亮方法
   try {
-    // 用高亮元素包裹选中的文本
+    // 创建一个新的span元素来包裹选中的文本
+    const highlightElement = document.createElement('span');
+    highlightElement.classList.add('highlight-text');
+    highlightElement.style.backgroundColor = currentHighlightColor;
+    highlightElement.style.padding = '1px 2px';
+    highlightElement.style.borderRadius = '2px';
+    highlightElement.style.cursor = 'pointer';
+    highlightElement.style.position = 'relative'; // 确保z-index生效
+    highlightElement.style.zIndex = maxZIndex; // 设置更高的z-index
+    
+    // 添加点击事件以取消高亮
+    highlightElement.addEventListener('click', function() {
+      this.outerHTML = this.innerHTML;
+    });
+    
+    // 复制选中范围
+    const newRange = selectedRange.cloneRange();
+    
+    // 尝试用高亮元素包裹选中的文本
     newRange.surroundContents(highlightElement);
   } catch (e) {
-    // 如果选择的内容跨越多个元素，创建一个新的span并设置文本内容
-    const textNode = document.createTextNode(selectedText);
-    highlightElement.appendChild(textNode);
-    newRange.deleteContents();
-    newRange.insertNode(highlightElement);
+    // 如果选择的内容跨越多个元素，使用逐行高亮方法
+    const segments = decomposeRange(selectedRange);
+    const highlightElements = [];
+    
+    // 对每个文本段进行高亮
+    segments.forEach(segment => {
+      const highlightElement = highlightTextSegment(segment, maxZIndex);
+      if (highlightElement) {
+        highlightElements.push(highlightElement);
+      }
+    });
   }
   
   // 保存高亮颜色设置
@@ -405,6 +505,64 @@ function highlightSelectedText() {
   window.getSelection().removeAllRanges();
   selectedText = '';
   selectedRange = null;
+}
+
+// 获取指定范围内的所有高亮元素
+function getHighlightsInRange(range) {
+  const highlights = [];
+  
+  // 获取范围内的所有元素
+  const startNode = range.startContainer;
+  const endNode = range.endContainer;
+  
+  // 如果开始和结束是同一个节点
+  if (startNode === endNode && startNode.nodeType === Node.TEXT_NODE) {
+    // 获取父元素中的所有高亮元素
+    const parentHighlights = Array.from(startNode.parentNode.querySelectorAll('span.highlight-text'));
+    return parentHighlights.filter(highlight => {
+      // 检查高亮元素是否在范围内
+      const highlightRange = document.createRange();
+      highlightRange.selectNodeContents(highlight);
+      return range.intersectsNode(highlight);
+    });
+  }
+  
+  // 创建一个临时元素来包含范围内的所有节点
+  const tempContainer = document.createElement('div');
+  const fragment = range.cloneContents();
+  tempContainer.appendChild(fragment);
+  
+  // 查找临时容器中的所有高亮元素
+  const tempHighlights = Array.from(tempContainer.querySelectorAll('span.highlight-text'));
+  
+  // 在原始文档中查找对应的高亮元素
+  tempHighlights.forEach(tempHighlight => {
+    // 获取高亮元素的文本内容
+    const highlightText = tempHighlight.textContent;
+    
+    // 在原始文档中查找具有相同文本内容的高亮元素
+    const allHighlights = document.querySelectorAll('span.highlight-text');
+    for (const highlight of allHighlights) {
+      if (highlight.textContent === highlightText && range.intersectsNode(highlight)) {
+        highlights.push(highlight);
+        break; // 找到匹配的高亮元素后跳出循环
+      }
+    }
+  });
+  
+  return highlights;
+}
+
+// 移除指定的高亮元素
+function removeHighlights(highlights) {
+  highlights.forEach(highlight => {
+    // 保留高亮元素内的文本内容，但移除高亮元素本身
+    const parent = highlight.parentNode;
+    while (highlight.firstChild) {
+      parent.insertBefore(highlight.firstChild, highlight);
+    }
+    parent.removeChild(highlight);
+  });
 }
 
 // 监听来自后台的消息
@@ -429,7 +587,8 @@ chrome.runtime.onMessage.addListener((message) => {
       customColors = message.customColors;
     }
   } else if (message.action === 'clearAllHighlights') {
-    clearAllHighlights();
+    // 清除所有高亮
+    clearHighlights();
   }
 });
 
